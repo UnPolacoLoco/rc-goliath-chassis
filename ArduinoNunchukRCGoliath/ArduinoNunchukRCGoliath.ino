@@ -37,16 +37,20 @@
 #define HORNFREQ 200
 #define REVERSELENGHT 500
 
+#define ArrayLenght(x) (sizeof(x) / sizeof(x[0]))
 
 byte acceleration;
 byte steering;
-//int yRead = 0;
 int reverseTimer = 0;
 
-byte digitalPins = 6;
-byte analogPins = 2;
+byte lastCButtonState = 0;
+byte lastZButtonState = 0;
 
+bool isForward = false;
+bool isReversing = false;
 
+bool goingLeft = false;
+bool goingRight = false;
 
 
 ArduinoNunchuk nunchuk = ArduinoNunchuk();
@@ -54,31 +58,23 @@ ArduinoNunchuk nunchuk = ArduinoNunchuk();
 void setup()
 {
 
-  byte digitalPinsArr[6] = {IN1A, IN1B, IN2A, IN2B, BUZZERPIN, LIGHTSPIN};
-  byte analogPinsArr[2] = {ACCELERATIONPIN, STEERINGPIN};
+  byte digitalPins[] = {IN1A, IN1B, IN2A, IN2B, BUZZERPIN, LIGHTSPIN};
+  byte analogPins[] = {ACCELERATIONPIN, STEERINGPIN};
   //Serial.begin(BAUDRATE);
 
-  for (int i = 0; i < analogPins; i++)
+  for (int i = 0; i < ArrayLenght(analogPins); i++)
   {
-    pinMode(analogPinsArr[i], OUTPUT);
-    analogWrite(analogPinsArr[i], 0);
+    pinMode(analogPins[i], OUTPUT);
+    analogWrite(analogPins[i], 0);
   }
 
-  //  pinMode(ACCELERATIONPIN, OUTPUT);
-  //  pinMode(STEERINGPIN, OUTPUT);
 
-  for (int i = 0; i < digitalPins; i++)
+  for (int i = 0; i < ArrayLenght(digitalPins); i++)
   {
-    pinMode(digitalPinsArr[i], OUTPUT);
-    digitalWrite(digitalPinsArr[i], LOW);
+    pinMode(digitalPins[i], OUTPUT);
+    digitalWrite(digitalPins[i], LOW);
   }
 
-  //  pinMode(BUZZERPIN, OUTPUT);
-  //  pinMode(LIGHTSPIN, OUTPUT);
-  //  pinMode(IN1A, OUTPUT);
-  //  pinMode(IN1B, OUTPUT);
-  //  pinMode(IN2A, OUTPUT);
-  //  pinMode(IN2B, OUTPUT);
 
   delay(5000);
 
@@ -123,22 +119,25 @@ void accelerationMotorControl ()
 
   if (nunchuk.analogY > FWRDDEADZONE)
   {
-    //yRead = nunchuk.analogY;
+    switch (nunchuk.analogY)
+    {
+      case 140 ... 180:
+        acceleration = map(nunchuk.analogY, 140, 180, 160, 200);
+        break;
 
-    //switch (yRead)
-    //{
-    // case 200 ... 255:
-    //  acceleration = 255;
-    // break;
+      case 181 ... 256:
+        acceleration = 255;
+        break;
+    }
 
-    //case 140 ... 199:
-    acceleration = map(nunchuk.analogY, 140, 255, 125, 255);
-    //break;
 
-    // }
+    if (!isForward)
+    {
+      isForward = true;
+      digitalWrite(IN1A, HIGH);
+      digitalWrite(IN1B, LOW);
+    }
 
-    digitalWrite(IN1A, HIGH);
-    digitalWrite(IN1B, LOW);
     analogWrite(ACCELERATIONPIN, acceleration);
 
   }
@@ -147,9 +146,13 @@ void accelerationMotorControl ()
 
     acceleration = map(nunchuk.analogY, 110, 0, 125, 255);
 
+    if (!isReversing)
+    {
+      isReversing = true;
+      digitalWrite(IN1A, LOW);
+      digitalWrite(IN1B, HIGH);
+    }
 
-    digitalWrite(IN1A, LOW);
-    digitalWrite(IN1B, HIGH);
     analogWrite(ACCELERATIONPIN, acceleration);
 
     if (reverseTimer % 90 == 1)
@@ -162,6 +165,8 @@ void accelerationMotorControl ()
 
   else
   {
+    isForward = false;
+    isReversing = false;
     analogWrite(ACCELERATIONPIN, 0);
     digitalWrite(IN1A, LOW);
     digitalWrite(IN1B, LOW);
@@ -172,25 +177,36 @@ void accelerationMotorControl ()
 void steeringMotorControl()
 {
 
-
   switch (nunchuk.analogX)
   {
     case 0 ... 80:
-      digitalWrite(IN2A, HIGH);
-      digitalWrite(IN2B, LOW);
-      digitalWrite(STEERINGPIN, HIGH);
+
+      if (!goingLeft)
+      {
+        digitalWrite(IN2A, HIGH);
+        digitalWrite(IN2B, LOW);
+        digitalWrite(STEERINGPIN, HIGH);
+        goingLeft = true;
+      }
       break;
 
     case 170 ... 255:
-      digitalWrite(IN2A, LOW);
-      digitalWrite(IN2B, HIGH);
-      digitalWrite(STEERINGPIN, HIGH);
+
+      if (!goingRight)
+      {
+        digitalWrite(IN2A, LOW);
+        digitalWrite(IN2B, HIGH);
+        digitalWrite(STEERINGPIN, HIGH);
+        goingRight = true;
+      }
       break;
 
     default:
       digitalWrite(IN2A, LOW);
       digitalWrite(IN2B, LOW);
       digitalWrite(STEERINGPIN, LOW);
+      goingLeft = false;
+      goingRight = false;
       break;
   }
 }
@@ -198,29 +214,40 @@ void steeringMotorControl()
 
 void policeLights()
 {
-  switch (nunchuk.zButton)
-  {
-    case 1:
-      digitalWrite(LIGHTSPIN, HIGH);
-      break;
 
-    case 0:
+  if (nunchuk.cButton != lastCButtonState)
+  {
+    if (nunchuk.cButton == 1)
+    {
+      digitalWrite(LIGHTSPIN, HIGH);
+    }
+    else
+    {
       digitalWrite(LIGHTSPIN, LOW);
-      break;
+    }
 
   }
-}
 
+  lastCButtonState = nunchuk.cButton;
+
+}
 void buzzer()
 {
-  switch (nunchuk.cButton)
-  {
-    case 1:
-      tone(BUZZERPIN, HORNFREQ, 10);
 
-    default:
-      break;
+  if (nunchuk.zButton != lastZButtonState)
+  {
+    if (nunchuk.zButton == 1)
+    {
+      tone(BUZZERPIN, HORNFREQ);
+    }
+    else
+    {
+      noTone(BUZZERPIN);
+    }
+
   }
+
+  lastZButtonState = nunchuk.zButton;
 
 }
 
