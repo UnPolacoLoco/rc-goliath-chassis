@@ -1,47 +1,43 @@
 /*
+  RC Goliath Arduino Mod code, project by Rafal Boguszewski.
+  Main project URL: http://wp.me/p91MV0-2C
 
   Library doing all the Nunchuk lifting:
   Copyright 2011-2013 Gabriel Bianconi, http://www.gabrielbianconi.com/
 
   Nunchuk project URL: http://www.gabrielbianconi.com/projects/arduinonunchuk/
 
-
-  Pin overview of the nunchuk attachment:
-  + to 5v of the arduino
-  - to GND of the arduino
-  Data (d) to Analog pin 4 (A4)
-  Clock (c) to Analog pin 5 (A5)
 */
+
+
+#define ArrayLenght(x) (sizeof(x) / sizeof(x[0]))
 
 #include <Wire.h>
 #include <ArduinoNunchuk.h>
 
 #define BAUDRATE 19200
 
-#define ACCELERATIONPIN 10 //PWM for vertical forward motor contror 
-#define IN1A 13
-#define IN1B 12
-
+#define ACCELERATIONPIN 10 
+#define IN1A 12
+#define IN1B 11
 
 #define STEERINGPIN 3
 #define IN2A 4
-#define IN2B 5
+#define IN2B 2
 
 #define BUZZERPIN 7
 #define LIGHTSPIN 8
 
-#define FWRDDEADZONE 140
-#define BACKDEADZONE 110
+#define FWRDDEADZONE 150
+#define BACKDEADZONE 80
 
-#define REVERSEFREQ 800
-#define HORNFREQ 200
-#define REVERSELENGHT 500
+#define INITFREQ 800
+#define HORNFREQ 600
+#define INITLENGHT 500
 
-#define ArrayLenght(x) (sizeof(x) / sizeof(x[0]))
 
 byte acceleration;
 byte steering;
-int reverseTimer = 0;
 
 byte lastCButtonState = 0;
 byte lastZButtonState = 0;
@@ -58,16 +54,17 @@ ArduinoNunchuk nunchuk = ArduinoNunchuk();
 void setup()
 {
 
-  byte digitalPins[] = {IN1A, IN1B, IN2A, IN2B, BUZZERPIN, LIGHTSPIN};
-  byte analogPins[] = {ACCELERATIONPIN, STEERINGPIN};
-  //Serial.begin(BAUDRATE);
+ //Serial.begin(BAUDRATE);
 
+ 
+  byte digitalPins[] = {IN1A, IN1B, IN2A, IN2B, BUZZERPIN, LIGHTSPIN, STEERINGPIN};
+  byte analogPins[] = {ACCELERATIONPIN};
+ 
   for (int i = 0; i < ArrayLenght(analogPins); i++)
   {
     pinMode(analogPins[i], OUTPUT);
     analogWrite(analogPins[i], 0);
   }
-
 
   for (int i = 0; i < ArrayLenght(digitalPins); i++)
   {
@@ -75,11 +72,17 @@ void setup()
     digitalWrite(digitalPins[i], LOW);
   }
 
-
-  delay(5000);
-
   nunchuk.init();
+  nunchuk.update();
 
+  while (!(nunchuk.zButton == 1 && nunchuk.cButton == 1))
+  {
+    nunchuk.update();
+    delay(250);
+  }
+
+  carInitialized();
+  delay(1500);
 }
 
 void loop()
@@ -105,7 +108,6 @@ void loop()
   steeringMotorControl();
 
   policeLights();
-
   buzzer();
 
 }
@@ -121,8 +123,8 @@ void accelerationMotorControl ()
   {
     switch (nunchuk.analogY)
     {
-      case 140 ... 180:
-        acceleration = map(nunchuk.analogY, 140, 180, 160, 200);
+      case 151 ... 180:
+        acceleration = map(nunchuk.analogY, 150, 180, 160, 200);
         break;
 
       case 181 ... 256:
@@ -141,10 +143,11 @@ void accelerationMotorControl ()
     analogWrite(ACCELERATIONPIN, acceleration);
 
   }
+  
   else if (nunchuk.analogY < BACKDEADZONE)
   {
 
-    acceleration = map(nunchuk.analogY, 110, 0, 125, 255);
+    acceleration = map(nunchuk.analogY, 79, 0, 125, 255);
 
     if (!isReversing)
     {
@@ -154,13 +157,6 @@ void accelerationMotorControl ()
     }
 
     analogWrite(ACCELERATIONPIN, acceleration);
-
-    if (reverseTimer % 90 == 1)
-    {
-      reverseTone();
-    }
-
-    reverseTimer++;
   }
 
   else
@@ -170,7 +166,6 @@ void accelerationMotorControl ()
     analogWrite(ACCELERATIONPIN, 0);
     digitalWrite(IN1A, LOW);
     digitalWrite(IN1B, LOW);
-    reverseTimer = 0;
   }
 }
 
@@ -211,7 +206,6 @@ void steeringMotorControl()
   }
 }
 
-
 void policeLights()
 {
 
@@ -231,6 +225,7 @@ void policeLights()
   lastCButtonState = nunchuk.cButton;
 
 }
+
 void buzzer()
 {
 
@@ -251,9 +246,10 @@ void buzzer()
 
 }
 
-void reverseTone()
+void carInitialized()
 {
-  tone(BUZZERPIN, REVERSEFREQ, REVERSELENGHT);
+  tone(BUZZERPIN, INITFREQ, INITLENGHT);
 }
+
 
 
