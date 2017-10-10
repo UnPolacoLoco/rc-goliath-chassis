@@ -5,7 +5,7 @@
   Library doing all the Nunchuk lifting:
   Copyright 2011-2013 Gabriel Bianconi, http://www.gabrielbianconi.com/
 
-  Nunchuk project URL: http://www.gabrielbianconi.com/projects/arduinonunchuk/
+  Nunchuk project URL: https://github.com/GabrielBianconi/arduino-nunchuk
 
 */
 
